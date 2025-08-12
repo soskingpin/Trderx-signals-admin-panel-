@@ -649,15 +649,14 @@
                     // Update token
                     localStorage.setItem('signalsToken', newToken);
                     
+                    // Increment token version to force logout on all devices
+                    const currentVersion = parseInt(localStorage.getItem('tokenVersion') || '0');
+                    localStorage.setItem('tokenVersion', currentVersion + 1);
+                    
                     // Reset user numbering by clearing user data
                     localStorage.removeItem('traderxUsers');
                     
-                    // Force all users to re-authenticate
-                    localStorage.setItem('tokenChanged', Date.now());
-                    
-                    // Force immediate logout for all users
-                    broadcastTokenChange();
-                    
+                    alert('Token updated! All users have been logged out immediately.');
                     tokenSuccess.style.display = 'block';
                     
                     // Hide success message after 3 seconds
@@ -671,21 +670,6 @@
                     alert('Please enter a valid token!');
                 }
             });
-            
-            function broadcastTokenChange() {
-                // Create a temporary iframe to force storage event across all tabs
-                const iframe = document.createElement('iframe');
-                iframe.style.display = 'none';
-                document.body.appendChild(iframe);
-                
-                // Force storage event
-                iframe.contentWindow.localStorage.setItem('signalsToken', document.getElementById('newToken').value);
-                
-                // Clean up
-                setTimeout(() => {
-                    document.body.removeChild(iframe);
-                }, 100);
-            }
             
             function showAdminPanel() {
                 loginSection.style.display = 'none';
