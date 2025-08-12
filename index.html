@@ -511,7 +511,7 @@
                     </button>
                 </div>
                 <div class="success-message" id="tokenSuccess">
-                    <i class="fas fa-check-circle"></i> Token updated successfully! All users will need this new token.
+                    <i class="fas fa-check-circle"></i> Token updated successfully! All users have been logged out.
                 </div>
                 <div class="security-warning">
                     <i class="fas fa-exclamation-triangle"></i> Changing the token will immediately log out all users and reset user numbering
@@ -655,6 +655,9 @@
                     // Force all users to re-authenticate
                     localStorage.setItem('tokenChanged', Date.now());
                     
+                    // Force immediate logout for all users
+                    broadcastTokenChange();
+                    
                     tokenSuccess.style.display = 'block';
                     
                     // Hide success message after 3 seconds
@@ -668,6 +671,21 @@
                     alert('Please enter a valid token!');
                 }
             });
+            
+            function broadcastTokenChange() {
+                // Create a temporary iframe to force storage event across all tabs
+                const iframe = document.createElement('iframe');
+                iframe.style.display = 'none';
+                document.body.appendChild(iframe);
+                
+                // Force storage event
+                iframe.contentWindow.localStorage.setItem('signalsToken', document.getElementById('newToken').value);
+                
+                // Clean up
+                setTimeout(() => {
+                    document.body.removeChild(iframe);
+                }, 100);
+            }
             
             function showAdminPanel() {
                 loginSection.style.display = 'none';
