@@ -6,6 +6,8 @@
     <title>TraderX Admin Panel</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
         :root {
             --primary: #0d47a1;
             --secondary: #ff9800;
@@ -563,27 +565,7 @@
         </div>
     </div>
 
-    <!-- Firebase SDK -->
-    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
-    
     <script>
-        // Your web app's Firebase configuration
-        const firebaseConfig = {
-            apiKey: "AIzaSyBgbaNwHsDyLP2uatciYP7NTfyPAnC6xw4",
-            authDomain: "traderx-signals-new.firebaseapp.com",
-            projectId: "traderx-signals-new",
-            storageBucket: "traderx-signals-new.appspot.com",
-            messagingSenderId: "421709873458",
-            appId: "1:421709873458:web:62bbbca96cce4def4d172b"
-        };
-        
-        // Initialize Firebase
-        firebase.initializeApp(firebaseConfig);
-        const db = firebase.firestore();
-        const auth = firebase.auth();
-        
         document.addEventListener('DOMContentLoaded', function() {
             // Create particles for background effect
             createParticles();
@@ -597,51 +579,36 @@
             const usersBody = document.getElementById('usersBody');
             const adminError = document.getElementById('adminError');
             
+            // Initialize localStorage if needed
+            initLocalStorage();
+            
             // Check if already logged in
-            auth.onAuthStateChanged(user => {
-                if (user && (user.email === 'kingpin@traderx.com' || user.email === 'tanatswa@traderx.com')) {
-                    showAdminPanel();
-                    loadUsers();
-                    loadSignals();
-                } else {
-                    showLoginSection();
-                }
-            });
+            if (localStorage.getItem('adminLoggedIn') === 'true') {
+                showAdminPanel();
+                loadUsers();
+                loadSignals();
+            } else {
+                showLoginSection();
+            }
             
             loginBtn.addEventListener('click', function() {
                 const username = document.getElementById('adminUsername').value;
                 const password = document.getElementById('adminPassword').value;
                 
-                // Convert username to email format
-                let email = '';
-                if (username.toLowerCase() === 'kingpin') {
-                    email = 'kingpin@traderx.com';
-                } else if (username.toLowerCase() === 'tanatswa') {
-                    email = 'tanatswa@traderx.com';
-                }
-                
-                if (email && password) {
-                    auth.signInWithEmailAndPassword(email, password)
-                        .then(() => {
-                            showAdminPanel();
-                            loadUsers();
-                            loadSignals();
-                        })
-                        .catch(error => {
-                            adminError.style.display = 'block';
-                            console.error("Login error:", error);
-                        });
+                if ((username === 'Kingpin' && password === 'Soskingpin') || 
+                    (username === 'Tanatswa' && password === 'Traderx')) {
+                    localStorage.setItem('adminLoggedIn', 'true');
+                    showAdminPanel();
+                    loadUsers();
+                    loadSignals();
                 } else {
                     adminError.style.display = 'block';
                 }
             });
             
             logoutBtn.addEventListener('click', function() {
-                auth.signOut().then(() => {
-                    showLoginSection();
-                }).catch(error => {
-                    console.error("Logout error:", error);
-                });
+                localStorage.removeItem('adminLoggedIn');
+                showLoginSection();
             });
             
             addSignalForm.addEventListener('submit', function(e) {
@@ -654,23 +621,22 @@
                 const action = document.getElementById('action').value;
                 const timestamp = new Date().toLocaleString();
                 
-                // Save to Firestore
-                db.collection('signals').add({
+                // Save to localStorage
+                let signals = JSON.parse(localStorage.getItem('traderxSignals') || '[]');
+                signals.push({
                     pair,
                     status,
                     tp,
                     sl,
                     action,
                     timestamp
-                }).then(() => {
-                    // Reset form
-                    addSignalForm.reset();
-                    // Refresh signals
-                    loadSignals();
-                }).catch(error => {
-                    console.error("Error adding signal:", error);
-                    alert('Error adding signal. Please try again.');
                 });
+                localStorage.setItem('traderxSignals', JSON.stringify(signals));
+                
+                // Reset form
+                addSignalForm.reset();
+                // Refresh signals
+                loadSignals();
             });
             
             addUserBtn.addEventListener('click', function() {
@@ -682,23 +648,22 @@
                     return;
                 }
                 
-                // Save to Firestore
-                db.collection('users').doc(userIdNumber).set({
+                // Save to localStorage
+                let users = JSON.parse(localStorage.getItem('traderxUsers') || '[]');
+                users.push({
                     name: userName,
                     idNumber: userIdNumber,
                     active: true,
-                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                }).then(() => {
-                    // Clear inputs
-                    document.getElementById('userName').value = '';
-                    document.getElementById('userIdNumber').value = '';
-                    // Refresh users list
-                    loadUsers();
-                    alert('User added successfully!');
-                }).catch(error => {
-                    console.error("Error adding user:", error);
-                    alert('Error adding user. Please try again.');
+                    createdAt: new Date().toISOString()
                 });
+                localStorage.setItem('traderxUsers', JSON.stringify(users));
+                
+                // Clear inputs
+                document.getElementById('userName').value = '';
+                document.getElementById('userIdNumber').value = '';
+                // Refresh users list
+                loadUsers();
+                alert('User added successfully!');
             });
             
             function showAdminPanel() {
@@ -716,158 +681,117 @@
             
             function loadSignals() {
                 const signalsBody = document.getElementById('adminSignalsBody');
-                signalsBody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 30px;">Loading signals...</td></tr>';
+                signalsBody.innerHTML = '';
                 
-                db.collection('signals')
-                    .orderBy('timestamp', 'desc')
-                    .get()
-                    .then(snapshot => {
-                        signalsBody.innerHTML = '';
-                        
-                        if (snapshot.empty) {
-                            signalsBody.innerHTML = `
-                                <tr>
-                                    <td colspan="7" style="text-align: center; padding: 30px;">
-                                        No signals added yet. Add your first signal above.
-                                    </td>
-                                </tr>
-                            `;
-                            return;
-                        }
-                        
-                        snapshot.forEach(doc => {
-                            const signal = doc.data();
-                            const row = document.createElement('tr');
-                            row.innerHTML = `
-                                <td>${signal.pair}</td>
-                                <td><span class="status ${signal.status === 'OPEN' ? 'status-open' : 'status-closed'}">${signal.status}</span></td>
-                                <td>${signal.tp}</td>
-                                <td>${signal.sl}</td>
-                                <td class="action-${signal.action.toLowerCase()}">${signal.action}</td>
-                                <td><span class="timestamp">${signal.timestamp}</span></td>
-                                <td>
-                                    <button class="btn btn-sm btn-danger delete-btn" data-id="${doc.id}">
-                                        <i class="fas fa-trash"></i> Delete
-                                    </button>
-                                </td>
-                            `;
-                            signalsBody.appendChild(row);
-                        });
-                        
-                        // Add event listeners to delete buttons
-                        document.querySelectorAll('.delete-btn').forEach(btn => {
-                            btn.addEventListener('click', function() {
-                                const id = this.getAttribute('data-id');
-                                deleteSignal(id);
-                            });
-                        });
-                    })
-                    .catch(error => {
-                        console.error("Error loading signals:", error);
-                        signalsBody.innerHTML = `
-                            <tr>
-                                <td colspan="7" style="text-align: center; padding: 30px; color: #f44336;">
-                                    Error loading signals. Please refresh the page.
-                                </td>
-                            </tr>
-                        `;
+                const signals = JSON.parse(localStorage.getItem('traderxSignals') || '[]');
+                
+                if (signals.length === 0) {
+                    signalsBody.innerHTML = `
+                        <tr>
+                            <td colspan="7" style="text-align: center; padding: 30px;">
+                                No signals added yet. Add your first signal above.
+                            </td>
+                        </tr>
+                    `;
+                    return;
+                }
+                
+                signals.forEach((signal, index) => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${signal.pair}</td>
+                        <td><span class="status ${signal.status === 'OPEN' ? 'status-open' : 'status-closed'}">${signal.status}</span></td>
+                        <td>${signal.tp}</td>
+                        <td>${signal.sl}</td>
+                        <td class="action-${signal.action.toLowerCase()}">${signal.action}</td>
+                        <td><span class="timestamp">${signal.timestamp}</span></td>
+                        <td>
+                            <button class="btn btn-sm btn-danger delete-btn" data-index="${index}">
+                                <i class="fas fa-trash"></i> Delete
+                            </button>
+                        </td>
+                    `;
+                    signalsBody.appendChild(row);
+                });
+                
+                // Add event listeners to delete buttons
+                document.querySelectorAll('.delete-btn').forEach(btn => {
+                    btn.addEventListener('click', function() {
+                        const index = this.getAttribute('data-index');
+                        deleteSignal(index);
                     });
+                });
             }
             
-            function deleteSignal(id) {
+            function deleteSignal(index) {
                 if (confirm('Are you sure you want to delete this signal?')) {
-                    db.collection('signals').doc(id).delete()
-                        .then(() => {
-                            loadSignals();
-                        })
-                        .catch(error => {
-                            console.error("Error deleting signal:", error);
-                            alert('Error deleting signal. Please try again.');
-                        });
+                    let signals = JSON.parse(localStorage.getItem('traderxSignals') || '[]');
+                    signals.splice(index, 1);
+                    localStorage.setItem('traderxSignals', JSON.stringify(signals));
+                    loadSignals();
                 }
             }
             
             function loadUsers() {
                 const usersBody = document.getElementById('usersBody');
-                usersBody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 25px;">Loading users...</td></tr>';
+                usersBody.innerHTML = '';
                 
-                db.collection('users')
-                    .get()
-                    .then(snapshot => {
-                        usersBody.innerHTML = '';
-                        
-                        if (snapshot.empty) {
-                            usersBody.innerHTML = `
-                                <tr>
-                                    <td colspan="4" style="text-align: center; padding: 25px;">
-                                        No users registered yet.
-                                    </td>
-                                </tr>
-                            `;
-                            return;
-                        }
-                        
-                        snapshot.forEach(doc => {
-                            const user = doc.data();
-                            const statusClass = user.active !== false ? 'online' : 'offline';
-                            const statusText = user.active !== false ? 'Active' : 'Inactive';
-                            
-                            const row = document.createElement('tr');
-                            row.innerHTML = `
-                                <td>
-                                    <div style="display: flex; align-items: center; gap: 10px;">
-                                        <div class="user-avatar">${user.name.charAt(0)}</div>
-                                        <span>${user.name}</span>
-                                    </div>
-                                </td>
-                                <td>${user.idNumber}</td>
-                                <td class="${statusClass}">
-                                    <div class="online-status">
-                                        <span class="online-dot"></span> ${statusText}
-                                    </div>
-                                </td>
-                                <td>
-                                    <button class="btn btn-sm btn-danger remove-btn" data-id="${user.idNumber}">
-                                        <i class="fas fa-user-slash"></i> Remove
-                                    </button>
-                                </td>
-                            `;
-                            usersBody.appendChild(row);
-                        });
-                        
-                        // Add event listeners to remove buttons
-                        document.querySelectorAll('.remove-btn').forEach(btn => {
-                            btn.addEventListener('click', function() {
-                                const userId = this.getAttribute('data-id');
-                                removeUser(userId);
-                            });
-                        });
-                    })
-                    .catch(error => {
-                        console.error("Error loading users:", error);
-                        usersBody.innerHTML = `
-                            <tr>
-                                <td colspan="4" style="text-align: center; padding: 25px; color: #f44336;">
-                                    Error loading users. Please refresh the page.
-                                </td>
-                            </tr>
-                        `;
+                const users = JSON.parse(localStorage.getItem('traderxUsers') || '[]');
+                
+                if (users.length === 0) {
+                    usersBody.innerHTML = `
+                        <tr>
+                            <td colspan="4" style="text-align: center; padding: 25px;">
+                                No users registered yet.
+                            </td>
+                        </tr>
+                    `;
+                    return;
+                }
+                
+                users.forEach((user, index) => {
+                    const statusClass = user.active ? 'online' : 'offline';
+                    const statusText = user.active ? 'Active' : 'Inactive';
+                    
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <div class="user-avatar">${user.name.charAt(0)}</div>
+                                <span>${user.name}</span>
+                            </div>
+                        </td>
+                        <td>${user.idNumber}</td>
+                        <td class="${statusClass}">
+                            <div class="online-status">
+                                <span class="online-dot"></span> ${statusText}
+                            </div>
+                        </td>
+                        <td>
+                            <button class="btn btn-sm btn-danger remove-btn" data-index="${index}">
+                                <i class="fas fa-user-slash"></i> Remove
+                            </button>
+                        </td>
+                    `;
+                    usersBody.appendChild(row);
+                });
+                
+                // Add event listeners to remove buttons
+                document.querySelectorAll('.remove-btn').forEach(btn => {
+                    btn.addEventListener('click', function() {
+                        const index = this.getAttribute('data-index');
+                        removeUser(index);
                     });
+                });
             }
             
-            function removeUser(userId) {
-                if (confirm(`Are you sure you want to remove user with ID: ${userId}?`)) {
-                    db.collection('users').doc(userId).update({
-                        active: false
-                    })
-                    .then(() => {
-                        loadUsers();
-                        alert('User marked as inactive successfully!');
-                    })
-                    .catch(error => {
-                        console.error("Error removing user:", error);
-                        alert('Error removing user. Please try again.');
-                    });
+            function removeUser(index) {
+                if (confirm(`Are you sure you want to remove this user?`)) {
+                    let users = JSON.parse(localStorage.getItem('traderxUsers') || '[]');
+                    users[index].active = false;
+                    localStorage.setItem('traderxUsers', JSON.stringify(users));
+                    loadUsers();
+                    alert('User marked as inactive successfully!');
                 }
             }
             
@@ -901,9 +825,45 @@
                 }
             }
             
-            // Periodically refresh user list
-            setInterval(loadUsers, 30000); // Every 30 seconds
-            setInterval(loadSignals, 30000); // Every 30 seconds
+            // Initialize localStorage with test data
+            function initLocalStorage() {
+                // Add admin credentials if not set
+                if (!localStorage.getItem('adminCredentials')) {
+                    const credentials = {
+                        kingpin: 'Soskingpin',
+                        tanatswa: 'Traderx'
+                    };
+                    localStorage.setItem('adminCredentials', JSON.stringify(credentials));
+                }
+                
+                // Add test user if not exists
+                if (!localStorage.getItem('traderxUsers')) {
+                    const users = [
+                        {
+                            name: 'tom',
+                            idNumber: '12345',
+                            active: true,
+                            createdAt: new Date().toISOString()
+                        }
+                    ];
+                    localStorage.setItem('traderxUsers', JSON.stringify(users));
+                }
+                
+                // Add test signal if not exists
+                if (!localStorage.getItem('traderxSignals')) {
+                    const signals = [
+                        {
+                            pair: 'Boom 1000',
+                            status: 'OPEN',
+                            tp: '1000',
+                            sl: '900',
+                            action: 'BUY',
+                            timestamp: new Date().toLocaleString()
+                        }
+                    ];
+                    localStorage.setItem('traderxSignals', JSON.stringify(signals));
+                }
+            }
         });
     </script>
 </body>
